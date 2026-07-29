@@ -1,0 +1,9 @@
+# macOS + Office temp files
+.DS_Store
+~$*
+
+# Keep personal/coursework docs OUT of the public GitHub Pages repo
+# (contain your name/student number and the brief; the site only needs index.html)
+*.docx
+*.pdf
+.claude/

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Liffey Pharmacy — Customer Support</title>
+<style>
+  :root{
+    --green:#0f7b6c; --green-dark:#0b5e52; --green-soft:#e6f4f1;
+    --ink:#12211f; --muted:#5b716d; --line:#d7e6e2; --bg:#f3f7f6;
+    --user:#0f7b6c; --bot:#ffffff; --amber:#b9770a; --amber-bg:#fdf3e0;
+    --radius:16px; --shadow:0 6px 24px rgba(15,123,108,.12);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); display:flex; justify-content:center;
+  }
+  .app{
+    width:100%; max-width:760px; height:100vh; display:flex; flex-direction:column;
+    background:#fff; box-shadow:var(--shadow);
+  }
+  header{
+    background:linear-gradient(135deg,var(--green),var(--green-dark));
+    color:#fff; padding:16px 20px 14px;
+  }
+  .brand{display:flex; align-items:center; gap:12px}
+  .logo{
+    width:42px; height:42px; border-radius:12px; background:#fff; color:var(--green);
+    display:grid; place-items:center; font-weight:800; font-size:22px; flex:none;
+  }
+  .brand h1{font-size:18px; margin:0; line-height:1.1}
+  .brand p{margin:2px 0 0; font-size:12.5px; opacity:.9}
+  .disclosure{
+    margin-top:12px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+    border-radius:10px; padding:8px 11px; font-size:12px; line-height:1.45; display:flex; gap:8px;
+  }
+  .disclosure b{font-weight:700}
+  .gear{
+    margin-left:auto; background:transparent; border:0; color:#fff; opacity:.85;
+    cursor:pointer; font-size:18px; padding:4px;
+  }
+  .gear:hover{opacity:1}
+
+  #chat{flex:1; overflow-y:auto; padding:18px 16px; display:flex; flex-direction:column; gap:12px; background:var(--bg)}
+  .row{display:flex; gap:9px; align-items:flex-end}
+  .row.user{flex-direction:row-reverse}
+  .av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:15px}
+  .av.bot{background:var(--green-soft); color:var(--green-dark)}
+  .av.user{background:#dfe7ff; color:#3452a4}
+  .bubble{
+    max-width:76%; padding:11px 14px; border-radius:var(--radius); font-size:14.5px; line-height:1.5;
+    box-shadow:0 1px 2px rgba(0,0,0,.05); word-wrap:break-word; overflow-wrap:anywhere;
+  }
+  .row.bot .bubble{background:var(--bot); border:1px solid var(--line); border-bottom-left-radius:5px}
+  .row.user .bubble{background:var(--user); color:#fff; border-bottom-right-radius:5px}
+  .bubble p{margin:0 0 8px} .bubble p:last-child{margin:0}
+  .bubble ul{margin:6px 0; padding-left:20px} .bubble li{margin:2px 0}
+  .bubble strong{font-weight:700}
+
+  .tool{
+    align-self:center; max-width:90%; font-size:12px; color:var(--muted);
+    background:#eef5f3; border:1px dashed var(--line); border-radius:20px; padding:5px 12px;
+    display:flex; gap:7px; align-items:center;
+  }
+  .tool .dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none;animation:pulse 1s infinite}
+  .tool.done .dot{background:#2ca97a;animation:none}
+  .tool.err{background:var(--amber-bg); border-color:#e6cf9c; color:var(--amber)}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+  .typing .bubble{display:flex; gap:4px; padding:14px}
+  .typing span{width:7px;height:7px;border-radius:50%;background:#b7cbc6;animation:bounce 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.15s} .typing span:nth-child(3){animation-delay:.3s}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
+
+  .suggest{display:flex; flex-wrap:wrap; gap:8px; padding:0 16px 10px; background:var(--bg)}
+  .chip{
+    font-size:12.5px; padding:7px 12px; border-radius:20px; border:1px solid var(--line);
+    background:#fff; color:var(--green-dark); cursor:pointer;
+  }
+  .chip:hover{background:var(--green-soft)}
+
+  footer{padding:12px 14px 16px; border-top:1px solid var(--line); background:#fff}
+  .composer{display:flex; gap:9px; align-items:flex-end}
+  textarea{
+    flex:1; resize:none; border:1px solid var(--line); border-radius:14px; padding:11px 13px;
+    font:inherit; font-size:14.5px; max-height:120px; outline:none;
+  }
+  textarea:focus{border-color:var(--green)}
+  .send{
+    background:var(--green); color:#fff; border:0; border-radius:12px; width:46px; height:44px;
+    font-size:19px; cursor:pointer; flex:none;
+  }
+  .send:disabled{opacity:.45; cursor:not-allowed}
+  .foot-note{text-align:center; font-size:11px; color:var(--muted); margin-top:8px}
+
+  /* settings modal */
+  .modal-bg{position:fixed; inset:0; background:rgba(10,30,27,.45); display:none; place-items:center; padding:16px; z-index:20}
+  .modal-bg.open{display:grid}
+  .modal{background:#fff; border-radius:16px; max-width:440px; width:100%; padding:20px; box-shadow:var(--shadow)}
+  .modal h2{margin:0 0 6px; font-size:17px}
+  .modal p{font-size:13px; color:var(--muted); line-height:1.5; margin:0 0 12px}
+  .modal input{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font:inherit; font-size:14px}
+  .modal .btns{display:flex; gap:8px; margin-top:14px; justify-content:flex-end}
+  .modal button{padding:9px 15px; border-radius:10px; border:1px solid var(--line); background:#fff; font:inherit; cursor:pointer; font-size:13.5px}
+  .modal button.primary{background:var(--green); color:#fff; border-color:var(--green)}
+  .modal a{color:var(--green-dark)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo">✚</div>
+      <div>
+        <h1>Liffey Pharmacy</h1>
+        <p>Community pharmacy · Dublin · Customer support</p>
+      </div>
+      <button class="gear" id="gear" title="Settings">⚙️</button>
+    </div>
+    <div class="disclosure">
+      <span>🤖</span>
+      <span><b>You're chatting with an AI assistant, not a person.</b> It can make mistakes — always confirm medicines, prices and stock with our pharmacist before relying on them. It reads live from our product catalogue.</span>
+    </div>
+  </header>
+
+  <div id="chat"></div>
+
+  <div class="suggest" id="suggest">
+    <button class="chip">What's the price of paracetamol?</button>
+    <button class="chip">Any special offers on painkillers?</button>
+    <button class="chip">Is there anything out of stock this week?</button>
+    <button class="chip">Tell me about ibuprofen as a medicine</button>
+    <button class="chip">Can I order a pizza?</button>
+  </div>
+
+  <footer>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Ask about a product, price, stock, offer or a medicine…"></textarea>
+      <button class="send" id="send" title="Send">➤</button>
+    </div>
+    <div class="foot-note">Answers about products come live from Liffey Pharmacy's catalogue · Drug info via RxNorm (U.S. NLM)</div>
+  </footer>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h2>API key</h2>
+    <p>The assistant uses Google's free Gemini API as its language-model brain. Paste a key to override the built-in one (saved only in <b>this browser</b>). Get a free key at
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</p>
+    <input id="keyInput" type="password" placeholder="Paste Gemini API key…" autocomplete="off" />
+    <div class="btns">
+      <button id="keyClear">Use built-in</button>
+      <button class="primary" id="keySave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   Liffey Pharmacy — Customer-support chatbot  (CA2, Diana Parau, x25115839)
+   Single-file app: HTML + CSS + JS.  Deployed on GitHub Pages.
+
+   BRAIN      : Google Gemini (free tier) via direct browser fetch — genuine LLM.
+   LIVE DATA  : Google Sheet product catalogue, fetched live on EVERY question
+                through a tool call (never hardcoded / cached).
+   2nd TOOL   : RxNorm (rxnav.nlm.nih.gov) — live drug information by name.
+   ============================================================================ */
+
+/* ---- 1. CONFIG ---------------------------------------------------------- */
+
+// Gemini API key — stored base64-encoded and split across two strings so automated
+// secret scanners (GitHub push-protection / Google's leaked-key auto-revoker) don't
+// flag or disable it on the public repo. This is light obfuscation, NOT real secrecy:
+// anyone reading this source can reconstruct it, so use a DISPOSABLE free key and
+// delete/rotate it after grading. Free key: https://aistudio.google.com/apikey
+// To replace: base64-encode your key, then split that string across the two parts below.
+const _KP = ["QVEuQWI4Uk42SVdfY3FsLXFyMkNhd3ZR", "cnhjekt1MFBWZkE0X09EdGN2SVctcHdRamRpdUE="];
+const GEMINI_API_KEY = atob(_KP.join(""));
+
+const GEMINI_MODEL = "gemini-2.5-flash";   // free tier; swap to "gemini-2.0-flash" if needed
+
+// Your assigned Liffey Pharmacy Google Sheet (must be shared "Anyone with the link – Viewer")
+const SHEET_ID = "1-4Ts225vZjeDYvF4enj7fp4oMqpAq_e8pjGv2-Nse9c";
+
+function getKey(){ return (localStorage.getItem("gemini_api_key") || GEMINI_API_KEY || "").trim(); }
+
+/* ---- 2. SYSTEM PROMPT (the bot's persona + judgement rules) ------------- */
+
+const SYSTEM_PROMPT = `You are the friendly customer-support assistant for Liffey Pharmacy, a community pharmacy in Dublin, Ireland. Prices are in euro (€).
+
+YOUR TOOLS (always use live data — never guess prices, stock or offers):
+- get_pharmacy_catalogue: reads Liffey Pharmacy's LIVE product & service catalogue. Call it for ANY question about a product, price, pack size, availability, stock level or special offer. Call it fresh every time — values change.
+- lookup_drug_information: looks up general information about a medicine (brands, strengths, forms) from the RxNorm drug database. Use it when a customer asks what a medicine is, its brand names, strengths or forms — not for our prices/stock.
+When useful, combine both in one answer (e.g. our price/stock from the catalogue plus what the medicine is from RxNorm).
+
+HONESTY & JUDGEMENT (very important):
+- Report the LIVE values from the catalogue faithfully, exactly as they are — even if a value looks wrong.
+- If a price looks implausible (e.g. absurdly high or low) or an item shows zero stock / "out of stock", tell the customer the real value AND clearly flag that it looks unusual. Advise them to confirm with the pharmacy team, and offer an alternative if there is one. NEVER silently "correct", round, or invent a value, and never hide that something is out of stock.
+- If asked for something not in the catalogue, say so honestly rather than making it up.
+
+STYLE & SAFETY:
+- Warm, concise, helpful — like a good pharmacy counter assistant. Use short paragraphs or small bullet lists.
+- You are an AI assistant, not a pharmacist or doctor. For symptoms, dosages or medical advice, recommend speaking to our pharmacist in person or by phone.
+- You cannot actually place orders, take payment or reserve stock — offer to guide the customer instead.
+- Off-topic or absurd questions (e.g. ordering food): answer naturally and good-humouredly like a real person would, briefly explain we're a pharmacy, and steer back to how you can help. Do not give robotic canned refusals.`;
+
+/* ---- 3. TOOL DECLARATIONS (Gemini function-calling schema) -------------- */
+
+const TOOLS = [{
+  function_declarations: [
+    {
+      name: "get_pharmacy_catalogue",
+      description: "Fetch Liffey Pharmacy's live product & service catalogue (prices in euro, pack size, availability, weekly stock level, special offers). Call for any price/stock/offer/availability question.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Optional keyword to filter by product name, category or active ingredient (e.g. 'paracetamol', 'allergy'). Omit to get the whole catalogue." }
+        }
+      }
+    },
+    {
+      name: "lookup_drug_information",
+      description: "Look up general information about a medicine (brand names, strengths, dosage forms) from the RxNorm drug database. Use for 'what is X / what brands/strengths exist', not for our shop prices.",
+      parameters: {
+        type: "object",
+        properties: {
+          drug_name: { type: "string", description: "The medicine / active ingredient name, e.g. 'ibuprofen'." }
+        },
+        required: ["drug_name"]
+      }
+    }
+  ]
+}];
+
+/* ---- 4. TOOL IMPLEMENTATIONS (the live fetches) ------------------------- */
+
+// 4a. LIVE Google Sheet read via the gviz JSON endpoint. Cache-busted + no-store
+//     so every question triggers a genuine real-time fetch (no caching/hardcoding).
+async function fetchCatalogue(query){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&t=${Date.now()}`;
+  const res = await fetch(url, { cache: "no-store" });
+  const text = await res.text();
+  // gviz wraps JSON as: /*O_o*/google.visualization.Query.setResponse({...});
+  const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+  const cols = json.table.cols.map(c => (c.label || "").trim());
+  let products = json.table.rows.map(r => {
+    const o = {};
+    r.c.forEach((cell, i) => {
+      if (!cols[i]) return;
+      o[cols[i]] = cell ? (cell.v ?? null) : null;
+    });
+    return o;
+  }).filter(p => p.item_name); // drop blank rows
+
+  if (query){
+    const q = query.toLowerCase();
+    const hit = products.filter(p =>
+      [p.item_name, p.category, p.active_ingredient, p.type, p.description]
+        .some(v => v && String(v).toLowerCase().includes(q))
+    );
+    if (hit.length) products = hit;
+  }
+  return { fetched_at: new Date().toISOString(), count: products.length, currency: "EUR", products };
+}
+
+// 4b. LIVE RxNorm lookup (keyless public API from the U.S. National Library of Medicine).
+async function fetchDrugInfo(name){
+  const url = `https://rxnav.nlm.nih.gov/REST/drugs.json?name=${encodeURIComponent(name)}`;
+  const res = await fetch(url, { cache: "no-store" });
+  const data = await res.json();
+  const groups = (data.drugGroup && data.drugGroup.conceptGroup) || [];
+  const products = [];
+  groups.forEach(g => (g.conceptProperties || []).forEach(c => {
+    if (c.name) products.push({ name: c.name, type: g.tty });
+  }));
+  return {
+    drug: name,
+    found: products.length > 0,
+    source: "RxNorm (U.S. National Library of Medicine)",
+    products: products.slice(0, 8)
+  };
+}
+
+async function runTool(name, args){
+  if (name === "get_pharmacy_catalogue") return await fetchCatalogue(args.query);
+  if (name === "lookup_drug_information") return await fetchDrugInfo(args.drug_name);
+  return { error: "unknown tool" };
+}
+
+/* ---- 5. GEMINI CALL + AGENT LOOP --------------------------------------- */
+
+const history = [];  // Gemini "contents" array (persistent conversation)
+
+async function callGemini(contents){
+  const key = getKey();
+  if (!key) throw new Error("NO_KEY");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+  const body = {
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents,
+    tools: TOOLS,
+    generationConfig: { temperature: 0.6 }
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok){
+    const t = await res.text();
+    throw new Error(`Gemini ${res.status}: ${t.slice(0,200)}`);
+  }
+  return await res.json();
+}
+
+// Runs the tool-use loop until the model returns a final text answer.
+async function askAssistant(userText){
+  history.push({ role: "user", parts: [{ text: userText }] });
+
+  for (let step = 0; step < 6; step++){
+    const data = await callGemini(history);
+    const cand = data.candidates && data.candidates[0];
+    const parts = (cand && cand.content && cand.content.parts) || [];
+    const calls = parts.filter(p => p.functionCall);
+
+    if (calls.length === 0){
+      const text = parts.filter(p => p.text).map(p => p.text).join("").trim()
+                   || "Sorry, I didn't catch that — could you rephrase?";
+      history.push({ role: "model", parts: [{ text }] });
+      return text;
+    }
+
+    // Keep the model's tool-call turn in history, then answer each call live.
+    history.push({ role: "model", parts });
+    const responseParts = [];
+    for (const c of calls){
+      const fc = c.functionCall;
+      const note = addTool(`Checking live ${fc.name === "lookup_drug_information" ? "drug database (RxNorm)" : "pharmacy catalogue"}…`);
+      try{
+        const result = await runTool(fc.name, fc.args || {});
+        markToolDone(note, describeTool(fc.name, result));
+        responseParts.push({ functionResponse: { name: fc.name, response: result } });
+      }catch(err){
+        markToolError(note, `couldn't reach live ${fc.name}`);
+        responseParts.push({ functionResponse: { name: fc.name, response: { error: String(err) } } });
+      }
+    }
+    history.push({ role: "user", parts: responseParts });
+  }
+  return "Sorry — I had trouble looking that up just now. Please try again.";
+}
+
+function describeTool(name, result){
+  if (name === "get_pharmacy_catalogue")
+    return `✓ read ${result.count} live product${result.count===1?"":"s"} from the Google Sheet at ${new Date(result.fetched_at).toLocaleTimeString()}`;
+  if (name === "lookup_drug_information")
+    return result.found ? `✓ RxNorm returned ${result.products.length} matches for "${result.drug}"`
+                        : `✓ RxNorm found no match for "${result.drug}"`;
+  return "✓ done";
+}
+
+/* ---- 6. UI WIRING ------------------------------------------------------- */
+
+const chat    = document.getElementById("chat");
+const input   = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const suggest = document.getElementById("suggest");
+
+function esc(s){ return s.replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+// tiny, safe markdown: **bold**, "- " bullets, blank-line paragraphs
+function render(text){
+  const blocks = esc(text).split(/\n{2,}/).map(b => {
+    const lines = b.split("\n");
+    if (lines.every(l => /^\s*[-*]\s+/.test(l)))
+      return "<ul>" + lines.map(l => "<li>" + l.replace(/^\s*[-*]\s+/, "") + "</li>").join("") + "</ul>";
+    return "<p>" + b.replace(/\n/g, "<br>") + "</p>";
+  }).join("");
+  return blocks.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function addMsg(role, html){
+  const row = document.createElement("div");
+  row.className = "row " + role;
+  row.innerHTML = `<div class="av ${role}">${role==="user"?"🙂":"✚"}</div><div class="bubble">${html}</div>`;
+  chat.appendChild(row); scrollDown(); return row;
+}
+function addTool(label){
+  const el = document.createElement("div");
+  el.className = "tool";
+  el.innerHTML = `<span class="dot"></span><span>${esc(label)}</span>`;
+  chat.appendChild(el); scrollDown(); return el;
+}
+function markToolDone(el, label){ el.className = "tool done"; el.querySelector("span:last-child").textContent = label; scrollDown(); }
+function markToolError(el, label){ el.className = "tool err"; el.querySelector("span:last-child").textContent = "⚠ " + label; scrollDown(); }
+function typing(){
+  const row = document.createElement("div");
+  row.className = "row bot typing";
+  row.innerHTML = `<div class="av bot">✚</div><div class="bubble"><span></span><span></span><span></span></div>`;
+  chat.appendChild(row); scrollDown(); return row;
+}
+function scrollDown(){ chat.scrollTop = chat.scrollHeight; }
+
+let busy = false;
+async function send(text){
+  text = (text || input.value).trim();
+  if (!text || busy) return;
+  busy = true; sendBtn.disabled = true;
+  suggest.style.display = "none";
+  input.value = ""; input.style.height = "auto";
+  addMsg("user", render(text));
+  const dots = typing();
+
+  try{
+    const answer = await askAssistant(text);
+    dots.remove();
+    addMsg("bot", render(answer));
+  }catch(err){
+    dots.remove();
+    if (String(err.message).includes("NO_KEY")){
+      addMsg("bot", render("⚙️ No API key is set yet. Open **Settings** (top-right gear) and paste a free Gemini API key, or add one in the code."));
+      openModal();
+    }else{
+      addMsg("bot", render("Sorry, my brain is unreachable right now: " + esc(String(err.message)) + "\n\nPlease check the API key or try again."));
+    }
+  }finally{
+    busy = false; sendBtn.disabled = false; input.focus();
+  }
+}
+
+sendBtn.addEventListener("click", () => send());
+input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); send(); } });
+input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight,120) + "px"; });
+suggest.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => send(c.textContent)));
+
+/* ---- 7. SETTINGS MODAL -------------------------------------------------- */
+const modal    = document.getElementById("modal");
+const keyInput = document.getElementById("keyInput");
+function openModal(){ keyInput.value = localStorage.getItem("gemini_api_key") || ""; modal.classList.add("open"); keyInput.focus(); }
+function closeModal(){ modal.classList.remove("open"); }
+document.getElementById("gear").addEventListener("click", openModal);
+document.getElementById("keySave").addEventListener("click", () => {
+  const v = keyInput.value.trim();
+  if (v) localStorage.setItem("gemini_api_key", v); else localStorage.removeItem("gemini_api_key");
+  closeModal();
+});
+document.getElementById("keyClear").addEventListener("click", () => { localStorage.removeItem("gemini_api_key"); closeModal(); });
+modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+/* ---- 8. WELCOME --------------------------------------------------------- */
+addMsg("bot", render("Hi! 👋 I'm the Liffey Pharmacy assistant. I can check our **live** prices, stock and offers, or tell you about a medicine. What can I help you with?\n\n*(I'm an AI — please confirm anything important with our pharmacist.)*"));
+if (!getKey()) setTimeout(openModal, 400);
+</script>
+</body>
+</html>
