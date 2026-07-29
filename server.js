@@ -43,19 +43,24 @@ const server = http.createServer((req, res) => {
           return res.end(JSON.stringify({ error: "OPENAI_API_KEY is not set on the server (Render → Environment)." }));
         }
         const payload = JSON.parse(body || "{}");
+        const oaBody = {
+          model: MODEL,
+          messages: payload.messages,
+          temperature: 0.6
+        };
+        // Only include tools / tool_choice when tools are actually provided —
+        // OpenAI rejects tool_choice on its own.
+        if (Array.isArray(payload.tools) && payload.tools.length) {
+          oaBody.tools = payload.tools;
+          oaBody.tool_choice = payload.tool_choice || "auto";
+        }
         const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${OPENAI_KEY}`
           },
-          body: JSON.stringify({
-            model: MODEL,
-            messages: payload.messages,
-            tools: payload.tools,
-            tool_choice: payload.tool_choice || "auto",
-            temperature: 0.6
-          })
+          body: JSON.stringify(oaBody)
         });
         const text = await upstream.text();       // pass OpenAI's JSON straight through
         res.writeHead(upstream.status, { "Content-Type": "application/json" });
