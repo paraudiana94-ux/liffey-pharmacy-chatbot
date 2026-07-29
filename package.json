@@ -1,0 +1,8 @@
+{
+  "name": "liffey-pharmacy-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Secret-key proxy for the Liffey Pharmacy chatbot (forwards to OpenAI).",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node server.js" }
+}

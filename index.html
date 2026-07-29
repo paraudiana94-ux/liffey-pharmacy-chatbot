@@ -37,11 +37,6 @@
     border-radius:10px; padding:8px 11px; font-size:12px; line-height:1.45; display:flex; gap:8px;
   }
   .disclosure b{font-weight:700}
-  .gear{
-    margin-left:auto; background:transparent; border:0; color:#fff; opacity:.85;
-    cursor:pointer; font-size:18px; padding:4px;
-  }
-  .gear:hover{opacity:1}
 
   #chat{flex:1; overflow-y:auto; padding:18px 16px; display:flex; flex-direction:column; gap:12px; background:var(--bg)}
   .row{display:flex; gap:9px; align-items:flex-end}
@@ -94,18 +89,6 @@
   }
   .send:disabled{opacity:.45; cursor:not-allowed}
   .foot-note{text-align:center; font-size:11px; color:var(--muted); margin-top:8px}
-
-  /* settings modal */
-  .modal-bg{position:fixed; inset:0; background:rgba(10,30,27,.45); display:none; place-items:center; padding:16px; z-index:20}
-  .modal-bg.open{display:grid}
-  .modal{background:#fff; border-radius:16px; max-width:440px; width:100%; padding:20px; box-shadow:var(--shadow)}
-  .modal h2{margin:0 0 6px; font-size:17px}
-  .modal p{font-size:13px; color:var(--muted); line-height:1.5; margin:0 0 12px}
-  .modal input{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font:inherit; font-size:14px}
-  .modal .btns{display:flex; gap:8px; margin-top:14px; justify-content:flex-end}
-  .modal button{padding:9px 15px; border-radius:10px; border:1px solid var(--line); background:#fff; font:inherit; cursor:pointer; font-size:13.5px}
-  .modal button.primary{background:var(--green); color:#fff; border-color:var(--green)}
-  .modal a{color:var(--green-dark)}
 </style>
 </head>
 <body>
@@ -117,7 +100,6 @@
         <h1>Liffey Pharmacy</h1>
         <p>Community pharmacy · Dublin · Customer support</p>
       </div>
-      <button class="gear" id="gear" title="Settings">⚙️</button>
     </div>
     <div class="disclosure">
       <span>🤖</span>
@@ -144,48 +126,26 @@
   </footer>
 </div>
 
-<!-- Settings modal -->
-<div class="modal-bg" id="modal">
-  <div class="modal">
-    <h2>API key</h2>
-    <p>The assistant uses Google's free Gemini API as its language-model brain. Paste a key to override the built-in one (saved only in <b>this browser</b>). Get a free key at
-      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</p>
-    <input id="keyInput" type="password" placeholder="Paste Gemini API key…" autocomplete="off" />
-    <div class="btns">
-      <button id="keyClear">Use built-in</button>
-      <button class="primary" id="keySave">Save</button>
-    </div>
-  </div>
-</div>
-
 <script>
 /* ============================================================================
    Liffey Pharmacy — Customer-support chatbot  (CA2, Diana Parau, x25115839)
-   Single-file app: HTML + CSS + JS.  Deployed on GitHub Pages.
 
-   BRAIN      : Google Gemini (free tier) via direct browser fetch — genuine LLM.
-   LIVE DATA  : Google Sheet product catalogue, fetched live on EVERY question
-                through a tool call (never hardcoded / cached).
-   2nd TOOL   : RxNorm (rxnav.nlm.nih.gov) — live drug information by name.
+   BRAIN   : OpenAI (gpt-4o-mini), reached through a Render proxy that holds the
+             SECRET API key server-side. No key is ever in this file or the
+             browser — the page only talks to the proxy.
+   LIVE DATA: the assigned Google Sheet catalogue, fetched live on EVERY question
+             through a tool call (never hardcoded / cached).
+   2nd TOOL : RxNorm (rxnav.nlm.nih.gov) — live drug information by name.
    ============================================================================ */
 
 /* ---- 1. CONFIG ---------------------------------------------------------- */
 
-// Gemini API key — stored base64-encoded and split across two strings so automated
-// secret scanners (GitHub push-protection / Google's leaked-key auto-revoker) don't
-// flag or disable it on the public repo. This is light obfuscation, NOT real secrecy:
-// anyone reading this source can reconstruct it, so use a DISPOSABLE free key and
-// delete/rotate it after grading. Free key: https://aistudio.google.com/apikey
-// To replace: base64-encode your key, then split that string across the two parts below.
-const _KP = ["QVEuQWI4Uk42SVdfY3FsLXFyMkNhd3ZR", "cnhjekt1MFBWZkE0X09EdGN2SVctcHdRamRpdUE="];
-const GEMINI_API_KEY = atob(_KP.join(""));
+// Your Render proxy URL (the service that holds the OpenAI key).
+// Set this to the URL Render gives you, e.g. https://liffey-pharmacy-api.onrender.com
+const API_BASE = "https://liffey-pharmacy-api.onrender.com";
 
-const GEMINI_MODEL = "gemini-2.5-flash";   // free tier; swap to "gemini-2.0-flash" if needed
-
-// Your assigned Liffey Pharmacy Google Sheet (must be shared "Anyone with the link – Viewer")
+// Your assigned Liffey Pharmacy Google Sheet (shared "Anyone with the link – Viewer")
 const SHEET_ID = "1-4Ts225vZjeDYvF4enj7fp4oMqpAq_e8pjGv2-Nse9c";
-
-function getKey(){ return (localStorage.getItem("gemini_api_key") || GEMINI_API_KEY || "").trim(); }
 
 /* ---- 2. SYSTEM PROMPT (the bot's persona + judgement rules) ------------- */
 
@@ -207,11 +167,12 @@ STYLE & SAFETY:
 - You cannot actually place orders, take payment or reserve stock — offer to guide the customer instead.
 - Off-topic or absurd questions (e.g. ordering food): answer naturally and good-humouredly like a real person would, briefly explain we're a pharmacy, and steer back to how you can help. Do not give robotic canned refusals.`;
 
-/* ---- 3. TOOL DECLARATIONS (Gemini function-calling schema) -------------- */
+/* ---- 3. TOOL DECLARATIONS (OpenAI function-calling schema) -------------- */
 
-const TOOLS = [{
-  function_declarations: [
-    {
+const TOOLS = [
+  {
+    type: "function",
+    function: {
       name: "get_pharmacy_catalogue",
       description: "Fetch Liffey Pharmacy's live product & service catalogue (prices in euro, pack size, availability, weekly stock level, special offers). Call for any price/stock/offer/availability question.",
       parameters: {
@@ -220,8 +181,11 @@ const TOOLS = [{
           query: { type: "string", description: "Optional keyword to filter by product name, category or active ingredient (e.g. 'paracetamol', 'allergy'). Omit to get the whole catalogue." }
         }
       }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "lookup_drug_information",
       description: "Look up general information about a medicine (brand names, strengths, dosage forms) from the RxNorm drug database. Use for 'what is X / what brands/strengths exist', not for our shop prices.",
       parameters: {
@@ -232,10 +196,10 @@ const TOOLS = [{
         required: ["drug_name"]
       }
     }
-  ]
-}];
+  }
+];
 
-/* ---- 4. TOOL IMPLEMENTATIONS (the live fetches) ------------------------- */
+/* ---- 4. TOOL IMPLEMENTATIONS (the live fetches, run in the browser) ------ */
 
 // 4a. LIVE Google Sheet read via the gviz JSON endpoint. Cache-busted + no-store
 //     so every question triggers a genuine real-time fetch (no caching/hardcoding).
@@ -243,7 +207,6 @@ async function fetchCatalogue(query){
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&t=${Date.now()}`;
   const res = await fetch(url, { cache: "no-store" });
   const text = await res.text();
-  // gviz wraps JSON as: /*O_o*/google.visualization.Query.setResponse({...});
   const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
   const cols = json.table.cols.map(c => (c.label || "").trim());
   let products = json.table.rows.map(r => {
@@ -253,7 +216,7 @@ async function fetchCatalogue(query){
       o[cols[i]] = cell ? (cell.v ?? null) : null;
     });
     return o;
-  }).filter(p => p.item_name); // drop blank rows
+  }).filter(p => p.item_name);
 
   if (query){
     const q = query.toLowerCase();
@@ -290,65 +253,53 @@ async function runTool(name, args){
   return { error: "unknown tool" };
 }
 
-/* ---- 5. GEMINI CALL + AGENT LOOP --------------------------------------- */
+/* ---- 5. LLM CALL (via Render proxy) + AGENT LOOP ------------------------ */
 
-const history = [];  // Gemini "contents" array (persistent conversation)
+const history = [{ role: "system", content: SYSTEM_PROMPT }];
 
-async function callGemini(contents){
-  const key = getKey();
-  if (!key) throw new Error("NO_KEY");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
-  const body = {
-    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents,
-    tools: TOOLS,
-    generationConfig: { temperature: 0.6 }
-  };
-  const res = await fetch(url, {
+async function callLLM(messages){
+  const res = await fetch(API_BASE.replace(/\/$/, "") + "/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ messages, tools: TOOLS, tool_choice: "auto" })
   });
   if (!res.ok){
     const t = await res.text();
-    throw new Error(`Gemini ${res.status}: ${t.slice(0,200)}`);
+    throw new Error(`Server ${res.status}: ${t.slice(0,200)}`);
   }
-  return await res.json();
+  return await res.json();  // OpenAI chat.completion response
 }
 
 // Runs the tool-use loop until the model returns a final text answer.
 async function askAssistant(userText){
-  history.push({ role: "user", parts: [{ text: userText }] });
+  history.push({ role: "user", content: userText });
 
   for (let step = 0; step < 6; step++){
-    const data = await callGemini(history);
-    const cand = data.candidates && data.candidates[0];
-    const parts = (cand && cand.content && cand.content.parts) || [];
-    const calls = parts.filter(p => p.functionCall);
+    const data = await callLLM(history);
+    const msg = data.choices && data.choices[0] && data.choices[0].message;
+    if (!msg) throw new Error("Empty response from the model");
 
-    if (calls.length === 0){
-      const text = parts.filter(p => p.text).map(p => p.text).join("").trim()
-                   || "Sorry, I didn't catch that — could you rephrase?";
-      history.push({ role: "model", parts: [{ text }] });
-      return text;
-    }
+    history.push(msg);  // keep the assistant turn (may contain tool_calls) in history
 
-    // Keep the model's tool-call turn in history, then answer each call live.
-    history.push({ role: "model", parts });
-    const responseParts = [];
-    for (const c of calls){
-      const fc = c.functionCall;
-      const note = addTool(`Checking live ${fc.name === "lookup_drug_information" ? "drug database (RxNorm)" : "pharmacy catalogue"}…`);
-      try{
-        const result = await runTool(fc.name, fc.args || {});
-        markToolDone(note, describeTool(fc.name, result));
-        responseParts.push({ functionResponse: { name: fc.name, response: result } });
-      }catch(err){
-        markToolError(note, `couldn't reach live ${fc.name}`);
-        responseParts.push({ functionResponse: { name: fc.name, response: { error: String(err) } } });
+    if (msg.tool_calls && msg.tool_calls.length){
+      for (const call of msg.tool_calls){
+        const name = call.function.name;
+        let args = {};
+        try { args = JSON.parse(call.function.arguments || "{}"); } catch(e){}
+        const note = addTool(`Checking live ${name === "lookup_drug_information" ? "drug database (RxNorm)" : "pharmacy catalogue"}…`);
+        try{
+          const result = await runTool(name, args);
+          markToolDone(note, describeTool(name, result));
+          history.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+        }catch(err){
+          markToolError(note, `couldn't reach live ${name}`);
+          history.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify({ error: String(err) }) });
+        }
       }
+      continue;  // let the model use the tool results
     }
-    history.push({ role: "user", parts: responseParts });
+
+    return (msg.content || "Sorry, I didn't catch that — could you rephrase?").trim();
   }
   return "Sorry — I had trouble looking that up just now. Please try again.";
 }
@@ -370,7 +321,6 @@ const sendBtn = document.getElementById("send");
 const suggest = document.getElementById("suggest");
 
 function esc(s){ return s.replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-// tiny, safe markdown: **bold**, "- " bullets, blank-line paragraphs
 function render(text){
   const blocks = esc(text).split(/\n{2,}/).map(b => {
     const lines = b.split("\n");
@@ -413,18 +363,20 @@ async function send(text){
   addMsg("user", render(text));
   const dots = typing();
 
+  // The Render free server may be asleep — show a gentle hint if it's slow to wake.
+  const wake = setTimeout(() => {
+    if (dots.isConnected) dots.querySelector(".bubble").insertAdjacentHTML("beforeend",
+      `<div style="font-size:11px;color:#8aa;margin-top:6px">waking up the server…</div>`);
+  }, 4000);
+
   try{
     const answer = await askAssistant(text);
-    dots.remove();
+    clearTimeout(wake); dots.remove();
     addMsg("bot", render(answer));
   }catch(err){
-    dots.remove();
-    if (String(err.message).includes("NO_KEY")){
-      addMsg("bot", render("⚙️ No API key is set yet. Open **Settings** (top-right gear) and paste a free Gemini API key, or add one in the code."));
-      openModal();
-    }else{
-      addMsg("bot", render("Sorry, my brain is unreachable right now: " + esc(String(err.message)) + "\n\nPlease check the API key or try again."));
-    }
+    clearTimeout(wake); dots.remove();
+    addMsg("bot", render("Sorry, my brain is unreachable right now: " + esc(String(err.message)) +
+      "\n\nIf this is the first message in a while, the free server may just be waking up — please try again in ~30 seconds."));
   }finally{
     busy = false; sendBtn.disabled = false; input.focus();
   }
@@ -435,23 +387,8 @@ input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey){ 
 input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight,120) + "px"; });
 suggest.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => send(c.textContent)));
 
-/* ---- 7. SETTINGS MODAL -------------------------------------------------- */
-const modal    = document.getElementById("modal");
-const keyInput = document.getElementById("keyInput");
-function openModal(){ keyInput.value = localStorage.getItem("gemini_api_key") || ""; modal.classList.add("open"); keyInput.focus(); }
-function closeModal(){ modal.classList.remove("open"); }
-document.getElementById("gear").addEventListener("click", openModal);
-document.getElementById("keySave").addEventListener("click", () => {
-  const v = keyInput.value.trim();
-  if (v) localStorage.setItem("gemini_api_key", v); else localStorage.removeItem("gemini_api_key");
-  closeModal();
-});
-document.getElementById("keyClear").addEventListener("click", () => { localStorage.removeItem("gemini_api_key"); closeModal(); });
-modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
-
-/* ---- 8. WELCOME --------------------------------------------------------- */
+/* ---- 7. WELCOME --------------------------------------------------------- */
 addMsg("bot", render("Hi! 👋 I'm the Liffey Pharmacy assistant. I can check our **live** prices, stock and offers, or tell you about a medicine. What can I help you with?\n\n*(I'm an AI — please confirm anything important with our pharmacist.)*"));
-if (!getKey()) setTimeout(openModal, 400);
 </script>
 </body>
 </html>
